@@ -3,20 +3,38 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Fatal {
-	#[error("failed to find language '{lang}'")]
-	LangNotFound { lang: String },
+	#[error("failed to render math expression")]
+	CannotRenderMath(#[from] katex::Error),
 
-	#[error("a call to syntect failed")]
-	SyntectError(#[from] syntect::Error),
+	#[error("failed to build katex configuration")]
+	CannotConfigMath(#[from] katex::opts::OptsBuilderError),
+
+	#[error("failed to highlight code block")]
+	CannotHighlight(#[from] syntect::Error),
+
+	#[error("failed to find language '{language}'")]
+	UnknownLanguage { language: String },
 
 	#[error("failed to find theme '{theme}'")]
-	ThemeNotFound { theme: String },
+	UnknownTheme { theme: String },
 }
 
-create_exception!(pulldown_cmark_py, PulldownCmarkError, PyException);
+create_exception!(pulldown_cmark, PulldownCmarkError, PyException);
+create_exception!(pulldown_cmark, CannotRenderMathError, PulldownCmarkError);
+create_exception!(pulldown_cmark, CannotConfigMathError, PulldownCmarkError);
+create_exception!(pulldown_cmark, CannotHighlightError, PulldownCmarkError);
+create_exception!(pulldown_cmark, UnknownLanguageError, PulldownCmarkError);
+create_exception!(pulldown_cmark, UnknownThemeError, PulldownCmarkError);
 
 impl From<Fatal> for PyErr {
 	fn from(err: Fatal) -> PyErr {
-		PulldownCmarkError::new_err(err.to_string())
+		let msg = err.to_string();
+		match err {
+			Fatal::CannotRenderMath(_) => CannotRenderMathError::new_err(msg),
+			Fatal::CannotConfigMath(_) => CannotConfigMathError::new_err(msg),
+			Fatal::CannotHighlight(_) => CannotHighlightError::new_err(msg),
+			Fatal::UnknownLanguage { .. } => UnknownLanguageError::new_err(msg),
+			Fatal::UnknownTheme { .. } => UnknownThemeError::new_err(msg),
+		}
 	}
 }

@@ -1,1 +1,17 @@
+# Rust-generated files
 /target
+
+# Python-generated files
+*.egg-info
+*.py[oc]
+*.so
+.hypothesis
+__pycache__/
+build/
+dist/
+typings
+wheels/
+
+# Virtual environments
+.direnv
+.venv

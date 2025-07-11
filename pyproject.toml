@@ -1,0 +1,36 @@
+[project]
+name = "pulldown-cmark"
+version = "0.1.0"
+description = "A Python interface to pulldown-cmark."
+readme = "README.md"
+authors = [{ name = "Mohamad Makki", email = "moe.m.makki@gmail.com" }]
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "lxml>=6.0.0",
+    "maturin>=1.9.1",
+    "pytest>=8.4.1",
+]
+
+[build-system]
+build-backend = "maturin"
+requires = [
+    "maturin>=1.9.1",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+include = ["pulldown_cmark"]
+
+[tool.pytest]
+testpaths = "tests"
+
+[tool.pytest.ini_options]
+addopts = "-rP"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["CPY", "T20", "ERA", "TD", "FIX", "TC001", "TC002", "TC003", "E741"]
+
+[tool.setuptools]
+packages = ["pulldown-cmark"]
