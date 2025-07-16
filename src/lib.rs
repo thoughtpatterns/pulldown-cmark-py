@@ -4,11 +4,11 @@ use crate::error::{
 	CannotConfigMathError, CannotHighlightError, CannotRenderMathError, Fatal,
 	PulldownCmarkError, UnknownLanguageError, UnknownThemeError,
 };
+use ::pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html::push_html};
 use html_escape::encode_safe;
 use itertools::process_results;
 use katex::{Opts, OutputType, render_with_opts};
 use once_cell::sync::Lazy;
-use ::pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html::push_html};
 use pyo3::{Python, prelude::*, types::PyList, wrap_pyfunction};
 use syntect::{
 	easy::HighlightLines,
@@ -59,7 +59,9 @@ static THEMES: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
 /// [0]: Front matter blocks are not parsed for data. These flags simply let the
 ///      parser skip them without error.
 /// [1]: `pulldown-cmark` will enable `footnotes` if `old-footnotes` is true.
-/// [2]: `pulldown-cmark` does not render math by default; this is an extension.
+/// [2]: Given this flag, `pulldown-cmark` does not render math, but rather exposes
+///      the parse events necessary to permit the use of external tools to do so;
+///      e.g., this program passes these events to KaTeX.
 #[pyclass(name = "Options")]
 #[derive(Clone, Copy)]
 struct PyOptions {
@@ -178,7 +180,7 @@ impl From<PyOptions> for Options {
 struct EventIter<'a, 'b> {
 	/// The wrapped parser.
 	parser: Parser<'a>,
-	/// The `syntect` to use. If `None`, code is not highlighted.
+	/// The `syntect` theme to use. If `None`, code is not highlighted.
 	theme: Option<&'b Theme>,
 	/// Whether to render math.
 	math: bool,
@@ -346,6 +348,7 @@ fn render(
 fn pulldown_cmark(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 	m.add_class::<PyOptions>()?;
 	m.add_function(wrap_pyfunction!(render, m)?)?;
+	m.add("THEMES", THEMES.themes.keys().cloned().collect::<Vec<String>>())?; /* Constant attribute to permit theme configuration validation. */
 	m.add("PulldownCmarkError", py.get_type::<PulldownCmarkError>())?;
 	m.add("CannotRenderMathError", py.get_type::<CannotRenderMathError>())?;
 	m.add("CannotConfigMathError", py.get_type::<CannotConfigMathError>())?;

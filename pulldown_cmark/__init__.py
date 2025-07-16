@@ -8,6 +8,7 @@ from .pulldown_cmark import (
     PulldownCmarkError,
     UnknownLanguageError,
     UnknownThemeError,
+    THEMES,
     render,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "PulldownCmarkError",
     "UnknownLanguageError",
     "UnknownThemeError",
+    "THEMES",
     "render",
 ]
