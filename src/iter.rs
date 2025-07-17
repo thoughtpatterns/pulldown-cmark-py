@@ -36,15 +36,16 @@ impl<'p, 'o> EventIter<'p, 'o> {
 		let (class, result) = if language.is_empty() {
 			(String::new(), String::from(encode_safe(&code)))
 		} else {
-			let class = format!(r#" class="language-{}""#, encode_safe(language));
-			let result = SYNTAXES
+			let syntax = SYNTAXES
 				.find_syntax_by_token(language)
 				.ok_or_else(|| Fatal::UnknownLanguage {
 					language: String::from(language),
-				})
-				.and_then(|syntax| EventIter::codeblock_impl(&code, syntax))?;
+				})?;
 
-			(class, result)
+			(
+				format!(r#" class="language-{}""#, encode_safe(language)),
+				Self::codeblock_impl(&code, syntax)?,
+			)
 		};
 
 		Ok(Event::Html(format!("<pre><code{class}>{result}</code></pre>").into()))
@@ -56,7 +57,7 @@ impl<'p, 'o> EventIter<'p, 'o> {
 		for line in LinesWithEndings::from(code) {
 			highlighter
 				.parse_html_for_line_which_includes_newline(line)
-				.map_err(|_| Fatal::CannotHighlight)?;
+				.map_err(|e| Fatal::CannotHighlight(e.to_string()))?;
 		}
 
 		Ok(highlighter.finalize())
@@ -71,6 +72,7 @@ impl<'p, 'o> EventIter<'p, 'o> {
 			.build()?;
 
 		let result = render_with_opts(math, &opts)?;
+
 		Ok(Event::Html(result.into()))
 	}
 }

@@ -118,27 +118,18 @@ impl PyOptions {
 		/* The `ENABLE_OLD_FOOTNOTES` bitflag implies `ENABLE_FOOTNOTES`. Set them
 		 * separately to not disable `ENABLE_FOOTNOTES` if `ENABLE_OLD_FOOTNOTES` is
 		 * false. */
-		match (old_footnotes, footnotes) {
-			(true, _) => pulldown.insert(Options::ENABLE_OLD_FOOTNOTES),
-			(false, true) => pulldown.insert(Options::ENABLE_FOOTNOTES),
-			_ => (),
-		}
+		if old_footnotes { pulldown.insert(Options::ENABLE_OLD_FOOTNOTES) }
+		else if footnotes { pulldown.insert(Options::ENABLE_FOOTNOTES) }
 
 		Self { pulldown, highlight }
 	}
 }
 
-impl PyOptions {
-	fn empty() -> Self {
+impl Default for PyOptions {
+	fn default() -> Self {
 		Self {
 			pulldown: Options::empty(),
 			highlight: false,
 		}
-	}
-}
-
-impl Default for PyOptions {
-	fn default() -> Self {
-		Self::empty()
 	}
 }

@@ -10,10 +10,10 @@ pub enum Fatal {
 	CannotConfigMath(#[from] katex::opts::OptsBuilderError),
 
 	#[error("failed to highlight code block")]
-	CannotHighlight,
+	CannotHighlight(String),
 
 	#[error("failed to get theme css")]
-	CannotGetCss,
+	CannotGetCss(String),
 
 	#[error("failed to find language '{language}'")]
 	UnknownLanguage { language: String },
@@ -40,8 +40,8 @@ impl From<Fatal> for PyErr {
 		match err {
 			Fatal::CannotRenderMath(_) => CannotRenderMathError::new_err(msg),
 			Fatal::CannotConfigMath(_) => CannotConfigMathError::new_err(msg),
-			Fatal::CannotHighlight => CannotHighlightError::new_err(msg),
-			Fatal::CannotGetCss => CannotGetCssError::new_err(msg),
+			Fatal::CannotHighlight(_) => CannotHighlightError::new_err(msg),
+			Fatal::CannotGetCss(_) => CannotGetCssError::new_err(msg),
 			Fatal::UnknownLanguage { .. } => UnknownLanguageError::new_err(msg),
 			Fatal::UnknownTheme { .. } => UnknownThemeError::new_err(msg),
 			Fatal::MissingTheme { .. } => MissingThemeError::new_err(msg),

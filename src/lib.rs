@@ -12,6 +12,7 @@ use ::pulldown_cmark::{Parser, html::push_html};
 use itertools::process_results;
 use once_cell::sync::Lazy;
 use pyo3::{Python, prelude::*, types::PyList, wrap_pyfunction};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use syntect::{
 	highlighting::ThemeSet,
@@ -19,7 +20,7 @@ use syntect::{
 };
 
 static THEMES: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
-static THEME_NICKNAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static THEME_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
 	HashMap::from([
 		("base16-eighties.dark", "base16-eighties.dark"),
 		("base16-mocha.dark", "base16-mocha.dark"),
@@ -49,12 +50,12 @@ static THEME_NICKNAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(||
 /// UnknownThemeError
 ///    If the theme provided could not be found.
 /// MissingThemeError
-///    If the theme nickname failed to resolve to its canonical name, i.e., a bug,
+///    If the theme alias failed to resolve to its canonical name, i.e., a bug,
 ///    but we avoid a panic to prevent a crash of the Python interpreter.
 #[pyfunction]
 #[pyo3(signature = (theme))]
 fn css(theme: &str) -> PyResult<String> {
-	let canonical = *THEME_NICKNAMES.get(theme).ok_or(Fatal::UnknownTheme {
+	let canonical = *THEME_ALIASES.get(theme).ok_or(Fatal::UnknownTheme {
 		theme: String::from(theme),
 	})?;
 
@@ -62,7 +63,10 @@ fn css(theme: &str) -> PyResult<String> {
 		theme: String::from(canonical),
 	})?;
 
-	Ok(css_for_theme_with_class_style(theme, ClassStyle::Spaced).map_err(|_| Fatal::CannotGetCss)?)
+	let result = css_for_theme_with_class_style(theme, ClassStyle::Spaced)
+		.map_err(|e| Fatal::CannotGetCss(e.to_string()))?;
+
+	Ok(result)
 }
 
 /// Render a list of Markdown strings into a list of HTML strings.
@@ -90,33 +94,32 @@ fn css(theme: &str) -> PyResult<String> {
 ///    If an unknown language is used to open a code block.
 #[pyfunction]
 #[pyo3(signature = (markdown, options = None))]
-fn render(markdown: &Bound<'_, PyList>, options: Option<PyOptions>) -> PyResult<Vec<String>> {
+fn render(py: Python, markdown: &Bound<'_, PyList>, options: Option<PyOptions>) -> PyResult<Vec<String>> {
 	let options = options.unwrap_or_default();
-	let mut result = Vec::with_capacity(markdown.len());
+	let inputs: Vec<String> = markdown
+		.iter()
+		.map(|wrapped| wrapped.extract())
+		.collect::<PyResult<_>>()?;
 
-	for entry in markdown.iter() {
-		let buffer: &str = entry.extract()?;
-		let parser = Parser::new_ext(buffer, options.pulldown);
-		let iter = EventIter::new(parser, &options);
-
-		let mut html = String::with_capacity(buffer.len());
-		process_results(iter, |events| {
-			push_html(&mut html, events);
-		})?;
-
-		result.push(html);
-	}
-
-	Ok(result)
+	py.allow_threads(move || {
+		inputs.par_iter()
+			.map(|buffer| {
+				let parser = Parser::new_ext(buffer, options.pulldown);
+				let iter = EventIter::new(parser, &options);
+				let mut output = String::with_capacity(buffer.len());
+				process_results(iter, |events| push_html(&mut output, events)).map(|_| output)
+			})
+			.collect::<Result<Vec<String>, Fatal>>()
+			.map_err(PyErr::from)
+	})
 }
 
-/// A Python wrapper around `pulldown-cmark` which can highlight syntax and render math.
+/// An easy-to-use Python wrapper around `pulldown-cmark`.
 #[pymodule]
 fn pulldown_cmark(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-	/* Constant attribute to permit theme configuration validation. */
-	let themes = THEME_NICKNAMES
+	let themes = THEME_ALIASES
 		.keys()
-		.map(|x| String::from(*x))
+		.map(|theme| String::from(*theme))
 		.collect::<Vec<String>>();
 
 	m.add_class::<PyOptions>()?;

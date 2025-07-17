@@ -22,5 +22,6 @@ katex = "0.4.6"
 once_cell = "1.21.3"
 pulldown-cmark = "0.13.0"
 pyo3 = { version = "0.25.1", features = ["extension-module"] }
+rayon = "1.10.0"
 syntect = { version = "5.2.0", features = ["html"] }
 thiserror = "2.0.12"
