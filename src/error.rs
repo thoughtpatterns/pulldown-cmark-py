@@ -10,21 +10,29 @@ pub enum Fatal {
 	CannotConfigMath(#[from] katex::opts::OptsBuilderError),
 
 	#[error("failed to highlight code block")]
-	CannotHighlight(#[from] syntect::Error),
+	CannotHighlight,
+
+	#[error("failed to get theme css")]
+	CannotGetCss,
 
 	#[error("failed to find language '{language}'")]
 	UnknownLanguage { language: String },
 
 	#[error("failed to find theme '{theme}'")]
 	UnknownTheme { theme: String },
+
+	#[error("bug: failed to find canonical theme '{theme}'")]
+	MissingTheme { theme: String },
 }
 
 create_exception!(pulldown_cmark, PulldownCmarkError, PyException);
 create_exception!(pulldown_cmark, CannotRenderMathError, PulldownCmarkError);
 create_exception!(pulldown_cmark, CannotConfigMathError, PulldownCmarkError);
 create_exception!(pulldown_cmark, CannotHighlightError, PulldownCmarkError);
+create_exception!(pulldown_cmark, CannotGetCssError, PulldownCmarkError);
 create_exception!(pulldown_cmark, UnknownLanguageError, PulldownCmarkError);
 create_exception!(pulldown_cmark, UnknownThemeError, PulldownCmarkError);
+create_exception!(pulldown_cmark, MissingThemeError, PulldownCmarkError);
 
 impl From<Fatal> for PyErr {
 	fn from(err: Fatal) -> PyErr {
@@ -32,9 +40,11 @@ impl From<Fatal> for PyErr {
 		match err {
 			Fatal::CannotRenderMath(_) => CannotRenderMathError::new_err(msg),
 			Fatal::CannotConfigMath(_) => CannotConfigMathError::new_err(msg),
-			Fatal::CannotHighlight(_) => CannotHighlightError::new_err(msg),
+			Fatal::CannotHighlight => CannotHighlightError::new_err(msg),
+			Fatal::CannotGetCss => CannotGetCssError::new_err(msg),
 			Fatal::UnknownLanguage { .. } => UnknownLanguageError::new_err(msg),
 			Fatal::UnknownTheme { .. } => UnknownThemeError::new_err(msg),
+			Fatal::MissingTheme { .. } => MissingThemeError::new_err(msg),
 		}
 	}
 }

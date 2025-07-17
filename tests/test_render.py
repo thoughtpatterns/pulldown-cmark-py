@@ -1,48 +1,49 @@
 """Test the render function."""
 
-# ruff: noqa: D101, D102
+# ruff: noqa: D101, D102, S101
 
 from textwrap import dedent
-from typing import Final, cast
+from typing import cast
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
 
 from pulldown_cmark import Options, render
 
-theme: Final = "base16-ocean.light"
 
+class TestRender:
+    @staticmethod
+    def assert_render(
+        html: str,
+        markdown: str,
+        options: Options | None = None,
+        *,
+        highlight: bool = False,
+    ) -> None:
+        """Test the output of render() against a static string.
 
-def assert_render(
-    html: str,
-    markdown: str,
-    options: Options | None = None,
-    theme: str | None = None,
-) -> None:
-    """Test the output of render() against a static string.
+        Markdown is dedented, and output whitespace is normalized where allowed.
+        """
 
-    Markdown is dedented, and output whitespace is normalized where allowed.
-    """
+        def normalize(string: str) -> str:
+            soup = BeautifulSoup(string, "lxml")
 
-    def normalize(string: str) -> str:
-        soup = BeautifulSoup(string, "lxml")
+            for node in soup.find_all(string=True):
+                if node.parent and node.parent.name in ("pre", "code", "textare"):
+                    continue  # Whitespace-sensitive tag bodies should not be stripped.
 
-        for node in soup.find_all(string=True):
-            if node.parent and node.parent.name in ("pre", "code", "textare"):
-                continue  # Whitespace-sensitive tag bodies should not be stripped.
+                text = NavigableString(" ".join(cast("str", node).split()))
+                _ = node.replace_with(text)
 
-            text = NavigableString(" ".join(cast("str", node).split()))
-            _ = node.replace_with(text)
+            return str(soup)
 
-        return str(soup)
+        html = normalize(html)
 
-    html = normalize(html)
-    markdown = normalize(render([dedent(markdown)], options, theme)[0])
+        markdown = render([dedent(markdown)], options, highlight=highlight)[0]
+        markdown = normalize(markdown)
 
-    assert html == markdown  # noqa: S101
+        assert html == markdown
 
-
-class TestExtensions:
     def test_tables(self) -> None:
         html = """
         <table>
@@ -67,7 +68,7 @@ class TestExtensions:
         | baz | qux |
         """
 
-        assert_render(html, markdown, Options(tables=True))
+        TestRender.assert_render(html, markdown, Options(tables=True))
 
     def test_footnotes(self) -> None:
         html = """
@@ -103,7 +104,7 @@ class TestExtensions:
           quux
         """
 
-        assert_render(html, markdown, Options(footnotes=True))
+        TestRender.assert_render(html, markdown, Options(footnotes=True))
 
     def test_strikethrough(self) -> None:
         html = """
@@ -114,7 +115,7 @@ class TestExtensions:
         ~~foo~~
         """
 
-        assert_render(html, markdown, Options(strikethrough=True))
+        TestRender.assert_render(html, markdown, Options(strikethrough=True))
 
     def test_tasklists(self) -> None:
         html = """
@@ -129,7 +130,7 @@ class TestExtensions:
         - [x] bar
         """
 
-        assert_render(html, markdown, Options(tasklists=True))
+        TestRender.assert_render(html, markdown, Options(tasklists=True))
 
     def test_smart_punctuation(self) -> None:
         html = """
@@ -140,7 +141,7 @@ class TestExtensions:
         'foo' "bar" baz--qux
         """
 
-        assert_render(html, markdown, Options(smart_punctuation=True))
+        TestRender.assert_render(html, markdown, Options(smart_punctuation=True))
 
     def test_heading_attributes(self) -> None:
         html = """
@@ -151,7 +152,7 @@ class TestExtensions:
         # foo {#bar .baz}
         """
 
-        assert_render(html, markdown, Options(heading_attributes=True))
+        TestRender.assert_render(html, markdown, Options(heading_attributes=True))
 
     def test_old_footnotes(self) -> None:
         html = """
@@ -187,7 +188,7 @@ class TestExtensions:
           quux
         """
 
-        assert_render(html, markdown, Options(old_footnotes=True))
+        TestRender.assert_render(html, markdown, Options(old_footnotes=True))
 
     def test_math(self) -> None:
         html = """
@@ -236,7 +237,7 @@ class TestExtensions:
         $$\int_0^1 x^2 \mathrm{d}x$$
         """
 
-        assert_render(html, markdown, Options(math=True))
+        TestRender.assert_render(html, markdown, Options(math=True))
 
     def test_gfm(self) -> None:
         html = """
@@ -250,7 +251,7 @@ class TestExtensions:
         > foo
         """
 
-        assert_render(html, markdown, Options(gfm=True))
+        TestRender.assert_render(html, markdown, Options(gfm=True))
 
     def test_definition_list(self) -> None:
         html = """
@@ -270,7 +271,7 @@ class TestExtensions:
         : qux
         """
 
-        assert_render(html, markdown, Options(definition_list=True))
+        TestRender.assert_render(html, markdown, Options(definition_list=True))
 
     def test_superscript(self) -> None:
         html = """
@@ -281,7 +282,7 @@ class TestExtensions:
         ^foo^
         """
 
-        assert_render(html, markdown, Options(superscript=True))
+        TestRender.assert_render(html, markdown, Options(superscript=True))
 
     def test_subscript(self) -> None:
         html = """
@@ -292,7 +293,7 @@ class TestExtensions:
         ~foo~
         """
 
-        assert_render(html, markdown, Options(subscript=True))
+        TestRender.assert_render(html, markdown, Options(subscript=True))
 
     def test_wikilinks(self) -> None:
         html = """
@@ -303,28 +304,22 @@ class TestExtensions:
         [[foo]]
         """
 
-        assert_render(html, markdown, Options(wikilinks=True))
+        TestRender.assert_render(html, markdown, Options(wikilinks=True))
 
     def test_highlight(self) -> None:
         html = """
-        <pre><code class="language-c"><span style=
-        "color:#b48ead;">int </span><span style=
-        "color:#8fa1b3;">main</span><span style=
-        "color:#4f5b66;">() { </span><span style=
-        "color:#4f5b66;">    </span><span style=
-        "color:#96b5b4;">puts</span><span style=
-        "color:#4f5b66;">("</span><span style=
-        "color:#a3be8c;">foo</span><span style=
-        "color:#4f5b66;">"); </span><span style=
-        "color:#4f5b66;">} </span></code></pre>
+        <pre><code class="language-rust"><span class=
+        "source rust"><span class="storage type rust">let</span> x
+            <span class="keyword operator rust">=</span> <span class=
+        "constant numeric integer decimal rust">1</span><span class=
+        "punctuation terminator rust">;</span>
+        </span></code></pre>
         """
 
         markdown = """
-        ```c
-        int main() {
-            puts("foo");
-        }
+        ```rust
+        let x
+            = 1;
         ```
         """
-
-        assert_render(html, markdown, theme=theme)
+        TestRender.assert_render(html, markdown, highlight=True)

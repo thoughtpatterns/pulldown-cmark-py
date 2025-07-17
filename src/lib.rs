@@ -1,8 +1,8 @@
 mod error;
 
 use crate::error::{
-	CannotConfigMathError, CannotHighlightError, CannotRenderMathError, Fatal,
-	PulldownCmarkError, UnknownLanguageError, UnknownThemeError,
+	CannotConfigMathError, CannotGetCssError, CannotHighlightError, CannotRenderMathError,
+	Fatal, MissingThemeError, PulldownCmarkError, UnknownLanguageError, UnknownThemeError,
 };
 use ::pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html::push_html};
 use html_escape::encode_safe;
@@ -10,16 +10,29 @@ use itertools::process_results;
 use katex::{Opts, OutputType, render_with_opts};
 use once_cell::sync::Lazy;
 use pyo3::{Python, prelude::*, types::PyList, wrap_pyfunction};
+use std::collections::HashMap;
 use syntect::{
-	easy::HighlightLines,
-	highlighting::{Theme, ThemeSet},
-	html::{IncludeBackground, append_highlighted_html_for_styled_line},
+	highlighting::ThemeSet,
+	html::{ClassStyle, ClassedHTMLGenerator, css_for_theme_with_class_style},
 	parsing::{SyntaxReference, SyntaxSet},
 	util::LinesWithEndings,
 };
 
 static SYNTAXES: Lazy<SyntaxSet> = Lazy::new(SyntaxSet::load_defaults_newlines);
 static THEMES: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
+
+/// Provide a uniform theme name style.
+static THEME_NICKNAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+	HashMap::from([
+		("base16-eighties.dark", "base16-eighties.dark"),
+		("base16-mocha.dark", "base16-mocha.dark"),
+		("base16-ocean.dark", "base16-ocean.dark"),
+		("base16-ocean.light", "base16-ocean.light"),
+		("inspired-github.light", "InspiredGitHub"),
+		("solarized.dark", "Solarized (dark)"),
+		("solarized.light", "Solarized (light)"),
+	])
+});
 
 /// Wraps `pulldown-cmark::Options` to configure CommonMark extensions.
 ///
@@ -59,9 +72,7 @@ static THEMES: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
 /// [0]: Front matter blocks are not parsed for data. These flags simply let the
 ///      parser skip them without error.
 /// [1]: `pulldown-cmark` will enable `footnotes` if `old-footnotes` is true.
-/// [2]: Given this flag, `pulldown-cmark` does not render math, but rather exposes
-///      the parse events necessary to permit the use of external tools to do so;
-///      e.g., this program passes these events to KaTeX.
+/// [2]: `pulldown-cmark` does not render math; this is an extension.
 #[pyclass(name = "Options")]
 #[derive(Clone, Copy)]
 struct PyOptions {
@@ -176,32 +187,35 @@ impl From<PyOptions> for Options {
 	}
 }
 
+// #[pyclass(name = "Config")]
+// #[derive(Clone, Copy)]
+// struct PyConfig {
+// 	#[pyo3(flatten)]
+// 	options: PyOptions,
+// }
+
 /// Wrapper around `pulldown_cmark::Parser` to highlight syntax and render math.
-struct EventIter<'a, 'b> {
-	/// The wrapped parser.
+struct EventIter<'a> {
+	/// The parser whose events to iterate over.
 	parser: Parser<'a>,
-	/// The `syntect` theme to use. If `None`, code is not highlighted.
-	theme: Option<&'b Theme>,
 	/// Whether to render math.
 	math: bool,
+	/// Whether to highlight syntax.
+	highlight: bool,
 }
 
-impl<'a, 'b> EventIter<'a, 'b> {
+impl<'a> EventIter<'a> {
 	/// Create a new `EventIter`.
-	pub fn new(parser: Parser<'a>, theme: Option<&'b Theme>, math: bool) -> Self {
+	pub fn new(parser: Parser<'a>, math: bool, highlight: bool) -> Self {
 		Self {
 			parser,
-			theme,
 			math,
+			highlight,
 		}
 	}
 
-	/// Handle a fenced codeblock, and highlight syntax if a language is specified.
-	fn codeblock(
-		parser: &mut Parser<'a>,
-		language: &str,
-		theme: &Theme,
-	) -> Result<Event<'a>, Fatal> {
+	/// Handle a fenced codeblock: highlight syntax if a language is specified, else escape HTML.
+	fn codeblock(parser: &mut Parser<'a>, language: &str) -> Result<Event<'a>, Fatal> {
 		let mut code = String::new();
 
 		for event in parser.by_ref() {
@@ -219,7 +233,7 @@ impl<'a, 'b> EventIter<'a, 'b> {
 		};
 
 		let result = match SYNTAXES.find_syntax_by_token(language) {
-			Some(syntax) => EventIter::highlight(&code, syntax, theme)?,
+			Some(syntax) => EventIter::codeblock_impl(&code, syntax)?,
 			None => String::from(encode_safe(&code)),
 		};
 
@@ -228,23 +242,21 @@ impl<'a, 'b> EventIter<'a, 'b> {
 		Ok(Event::Html(result.into()))
 	}
 
-	/// Highlight a string of code given a syntax and a theme.
-	///
-	/// Works similarly to `syntect::html::highlighted_html_for_string()`.
-	fn highlight(code: &str, syntax: &SyntaxReference, theme: &Theme) -> Result<String, Fatal> {
-		let mut highlighter = HighlightLines::new(syntax, theme);
-		let mut result = String::new();
+	/// Highlight a string of code, given a syntax.
+	fn codeblock_impl(code: &str, syntax: &SyntaxReference) -> Result<String, Fatal> {
+		let mut highlighter = ClassedHTMLGenerator::new_with_class_style(
+			syntax,
+			&SYNTAXES,
+			ClassStyle::Spaced,
+		);
 
 		for line in LinesWithEndings::from(code) {
-			let regions = highlighter.highlight_line(line, &SYNTAXES)?;
-			append_highlighted_html_for_styled_line(
-				&regions,
-				IncludeBackground::No,
-				&mut result,
-			)?;
+			highlighter
+				.parse_html_for_line_which_includes_newline(line)
+				.map_err(|_| Fatal::CannotHighlight)?;
 		}
 
-		Ok(result)
+		Ok(highlighter.finalize())
 	}
 
 	/// Render a math expression, inline or display, into MathML.
@@ -261,24 +273,63 @@ impl<'a, 'b> EventIter<'a, 'b> {
 	}
 }
 
-impl<'a, 'b> Iterator for EventIter<'a, 'b> {
+impl<'a> Iterator for EventIter<'a> {
 	type Item = Result<Event<'a>, Fatal>;
 
 	/// Advance the iterator, and intercept codeblocks and math expressions.
+	#[rustfmt::skip]
 	fn next(&mut self) -> Option<Self::Item> {
 		Some(match self.parser.next()? {
-			Event::InlineMath(math) if self.math => Self::math(&math, false),
-			Event::DisplayMath(math) if self.math => Self::math(&math, true),
+			Event::InlineMath(math) if self.math
+				=> Self::math(&math, false),
 
-			Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language)))
-				if self.theme.is_some() =>
-			{
-				Self::codeblock(&mut self.parser, &language, self.theme.unwrap())
-			}
+			Event::DisplayMath(math) if self.math
+				=> Self::math(&math, true),
+
+			Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language))) if self.highlight
+				=> Self::codeblock(&mut self.parser, &language),
 
 			default => Ok(default),
 		})
 	}
+}
+
+/// Get a CSS string for a given theme.
+///
+/// Parameters
+/// ----------
+/// theme
+///     The name of the theme to search for.
+///
+/// Returns
+/// -------
+/// A CSS string to highlight the given theme.
+///
+/// Raises
+/// ------
+/// CannotGetCssError
+///    If the CSS string could not be assembled.
+/// UnknownThemeError
+///    If the theme provided could not be found.
+/// MissingThemeError
+///    If the theme nickname failed to resolve to its canonical name, i.e., a bug,
+///    but we avoid a panic to prevent a crash of the Python interpreter.
+#[pyfunction]
+#[pyo3(signature = (theme))]
+fn css(theme: String) -> PyResult<String> {
+	let canonical = *THEME_NICKNAMES
+		.get(theme.as_str())
+		.ok_or(Fatal::UnknownTheme { theme })?;
+
+	let theme = THEMES
+		.themes
+		.get(canonical)
+		.ok_or_else(|| Fatal::MissingTheme {
+			theme: canonical.into(),
+		})?;
+
+	Ok(css_for_theme_with_class_style(theme, ClassStyle::Spaced)
+		.map_err(|_| Fatal::CannotGetCss)?)
 }
 
 /// Render a list of Markdown strings into a list of HTML strings.
@@ -289,12 +340,15 @@ impl<'a, 'b> Iterator for EventIter<'a, 'b> {
 ///     A list of Markdown strings to render.
 /// options
 ///     The `pulldown_cmark` extensions to enable.
-/// theme
-///     The name of the `syntect` theme to use to highlight code. If None,
-///     do not highlight code.
+/// highlight
+///     Whether to highlight syntax in codeblocks.
 ///
 /// Returns
 /// -------
+/// A list of HTML strings which preserves the indices of `markdown`.
+///
+/// Raises
+/// ------
 /// CannotRenderMathError
 ///    If a LaTeX expression cannot be rendered.
 /// CannotConfigMathError
@@ -303,23 +357,13 @@ impl<'a, 'b> Iterator for EventIter<'a, 'b> {
 ///    If a codeblock cannot be highlighted.
 /// UnknownLanguageError
 ///    If an unknown language is used to open a code block.
-/// UnknownThemeError
-///    If the specified theme cannot be found.
 #[pyfunction]
-#[pyo3(signature = (markdown, options = None, theme = None))]
+#[pyo3(signature = (markdown, options = None, *, highlight = false))]
 fn render(
 	markdown: &Bound<'_, PyList>,
 	options: Option<PyOptions>,
-	theme: Option<&str>,
+	highlight: bool,
 ) -> PyResult<Vec<String>> {
-	let theme: Option<&Theme> = theme
-		.map(|name| {
-			THEMES.themes.get(name).ok_or_else(|| Fatal::UnknownTheme {
-				theme: String::from(name),
-			})
-		})
-		.transpose()?;
-
 	let options = options
 		.map(|py_options| py_options.into())
 		.unwrap_or(Options::empty());
@@ -329,7 +373,8 @@ fn render(
 	for entry in markdown.iter() {
 		let buffer: &str = entry.extract()?;
 		let parser = Parser::new_ext(buffer, options);
-		let iter = EventIter::new(parser, theme, options.contains(Options::ENABLE_MATH));
+		let iter =
+			EventIter::new(parser, options.contains(Options::ENABLE_MATH), highlight);
 		let mut html = String::with_capacity(buffer.len());
 
 		process_results(iter, |events| {
@@ -346,14 +391,19 @@ fn render(
 #[rustfmt::skip]
 #[pymodule]
 fn pulldown_cmark(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+	let themes = THEME_NICKNAMES.keys().map(|x| String::from(*x)).collect::<Vec<String>>();
+
 	m.add_class::<PyOptions>()?;
+	m.add_function(wrap_pyfunction!(css, m)?)?;
 	m.add_function(wrap_pyfunction!(render, m)?)?;
-	m.add("THEMES", THEMES.themes.keys().cloned().collect::<Vec<String>>())?; /* Constant attribute to permit theme configuration validation. */
+	m.add("THEMES", themes)?; /* Constant attribute to permit theme configuration validation. */
 	m.add("PulldownCmarkError", py.get_type::<PulldownCmarkError>())?;
 	m.add("CannotRenderMathError", py.get_type::<CannotRenderMathError>())?;
 	m.add("CannotConfigMathError", py.get_type::<CannotConfigMathError>())?;
 	m.add("CannotHighlightError", py.get_type::<CannotHighlightError>())?;
+	m.add("CannotGetCssError", py.get_type::<CannotGetCssError>())?;
 	m.add("UnknownLanguageError", py.get_type::<UnknownLanguageError>())?;
 	m.add("UnknownThemeError", py.get_type::<UnknownThemeError>())?;
+	m.add("MissingThemeError", py.get_type::<MissingThemeError>())?;
 	Ok(())
 }
