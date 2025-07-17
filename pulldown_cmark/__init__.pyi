@@ -41,8 +41,6 @@ def css(theme: str) -> str: ...
 def render(
     markdown: list[str],
     options: Options | None = None,
-    *,
-    highlight: bool = False,
 ) -> list[str]: ...
 
 THEMES: list[str]
