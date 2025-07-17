@@ -1,8 +1,9 @@
 mod error;
+mod options;
 
 use crate::error::{
-	CannotConfigMathError, CannotGetCssError, CannotHighlightError, CannotRenderMathError,
-	Fatal, MissingThemeError, PulldownCmarkError, UnknownLanguageError, UnknownThemeError,
+	CannotConfigMathError, CannotGetCssError, CannotHighlightError, CannotRenderMathError, Fatal,
+	MissingThemeError, PulldownCmarkError, UnknownLanguageError, UnknownThemeError,
 };
 use ::pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd, html::push_html};
 use html_escape::encode_safe;
@@ -39,62 +40,55 @@ static THEME_NICKNAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(||
 /// Parameters
 /// ----------
 /// tables
-///     Enable GFM-style table support.
+///     Render GFM-style tables.
 /// footnotes
-///     Enable GFM-style footnotes.
+///     Render GFM-style footnotes.
 /// strikethrough
-///     Enable strikethrough (`~~text~~`).
+///     Render strikethrough (`~~text~~`).
 /// tasklists
-///     Enable task lists.
+///     Render task lists.
 /// smart_punctuation
-///     Enable smart quotes and punctuation ligatures.
+///     Render smart quotes and punctuation ligatures.
 /// heading_attributes
-///     Enable custom IDs and classes for headings.
+///     Render custom IDs and classes for headings.
 /// yaml_style_metadata_blocks [0]
-///     Enable YAML-style front matter blocks (start with `---` and end with `---` or `...`).
+///     Skip YAML-style front matter blocks, which start with `---` and end with `---` or `...`.
 /// pluses_delimited_metadata_blocks [0]
-///     Enable TOML-style front matter blocks (start and end with `+++`).
+///     Skip TOML-style front matter blocks, which start and end with `+++`.
 /// old_footnotes [1]
-///     Enable vanilla-Markdown-style footnotes.
+///     Render vanilla-Markdown-style footnotes.
 /// math [2]
-///     Enable LaTeX math rendering.
+///     Render LaTeX, delimited with `$` for inline or `$$` for display.
 /// gfm
-///     Enable blockquote tags ([!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION]).
+///     Render blockquote tags: [!NOTE], [!TIP], [!IMPORTANT], [!WARNING], and [!CAUTION].
 /// definition_list
-///     Enable `commonmark-hs/commonmark-extensions` definition lists.
+///     Render `commonmark-hs/commonmark-extensions` definition lists.
 /// superscript
-///     Enable superscript (`^text^`).
+///     Render superscript (`^text^`).
 /// subscript
-///     Enable subscript (`~text~`).
+///     Render subscript (`~text~`).
 /// wikilinks
-///     Enable Obsidian-style wikilinks.
+///     Render Obsidian-style wikilinks.
+/// highlight [2]
+///     Highlight syntax in codeblocks.
 ///
-/// [0]: Front matter blocks are not parsed for data. These flags simply let the
-///      parser skip them without error.
+/// [0]: Front matter blocks are *not* parsed for data. These flags simply let
+///      the parser skip them without error.
 /// [1]: `pulldown-cmark` will enable `footnotes` if `old-footnotes` is true.
-/// [2]: `pulldown-cmark` does not render math; this is an extension.
+/// [2]: `pulldown-cmark` does not render math or highlight syntax; these are
+///      extensions.
 #[pyclass(name = "Options")]
 #[derive(Clone, Copy)]
 struct PyOptions {
-	tables: bool,
-	footnotes: bool,
-	strikethrough: bool,
-	tasklists: bool,
-	smart_punctuation: bool,
-	heading_attributes: bool,
-	yaml_style_metadata_blocks: bool,
-	pluses_delimited_metadata_blocks: bool,
-	old_footnotes: bool,
-	math: bool,
-	gfm: bool,
-	definition_list: bool,
-	superscript: bool,
-	subscript: bool,
-	wikilinks: bool,
+	pulldown: Options,
+	highlight: bool,
 }
 
 #[pymethods]
 impl PyOptions {
+	/// Create a new `PyOptions` (`Options` in Python) instance.
+	///
+	/// All options are disabled by default.
 	#[new]
 	#[pyo3(signature = (
 		*,
@@ -113,11 +107,10 @@ impl PyOptions {
 		superscript = false,
 		subscript = false,
 		wikilinks = false,
+		highlight = false,
 	))]
-	/// Create a new `PyOptions` (`Options` in Python) instance.
-	///
-	/// All options are disabled by default.
 	#[allow(clippy::too_many_arguments)]
+	#[rustfmt::skip]
 	fn new(
 		tables: bool,
 		footnotes: bool,
@@ -134,90 +127,63 @@ impl PyOptions {
 		superscript: bool,
 		subscript: bool,
 		wikilinks: bool,
+		highlight: bool,
 	) -> Self {
-		Self {
-			tables,
-			footnotes,
-			strikethrough,
-			tasklists,
-			smart_punctuation,
-			heading_attributes,
-			yaml_style_metadata_blocks,
-			pluses_delimited_metadata_blocks,
-			old_footnotes,
-			math,
-			gfm,
-			definition_list,
-			superscript,
-			subscript,
-			wikilinks,
-		}
-	}
-}
+		let mut pulldown = Options::empty();
 
-#[rustfmt::skip]
-impl From<PyOptions> for Options {
-	/// Convert `PyOptions` to `pulldown_cmark::Options`.
-	fn from(from: PyOptions) -> Self {
-		let mut result = Options::empty();
-
-		result.set(Options::ENABLE_TABLES, from.tables);
-		result.set(Options::ENABLE_STRIKETHROUGH, from.strikethrough);
-		result.set(Options::ENABLE_TASKLISTS, from.tasklists);
-		result.set(Options::ENABLE_SMART_PUNCTUATION, from.smart_punctuation);
-		result.set(Options::ENABLE_HEADING_ATTRIBUTES, from.heading_attributes);
-		result.set(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS, from.yaml_style_metadata_blocks);
-		result.set(Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS, from.pluses_delimited_metadata_blocks);
-		result.set(Options::ENABLE_MATH, from.math);
-		result.set(Options::ENABLE_GFM, from.gfm);
-		result.set(Options::ENABLE_DEFINITION_LIST, from.definition_list);
-		result.set(Options::ENABLE_SUPERSCRIPT, from.superscript);
-		result.set(Options::ENABLE_SUBSCRIPT, from.subscript);
-		result.set(Options::ENABLE_WIKILINKS, from.wikilinks);
+		pulldown.set(Options::ENABLE_TABLES, tables);
+		pulldown.set(Options::ENABLE_STRIKETHROUGH, strikethrough);
+		pulldown.set(Options::ENABLE_TASKLISTS, tasklists);
+		pulldown.set(Options::ENABLE_SMART_PUNCTUATION, smart_punctuation);
+		pulldown.set(Options::ENABLE_HEADING_ATTRIBUTES, heading_attributes);
+		pulldown.set(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS, yaml_style_metadata_blocks);
+		pulldown.set(Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS, pluses_delimited_metadata_blocks);
+		pulldown.set(Options::ENABLE_MATH, math);
+		pulldown.set(Options::ENABLE_GFM, gfm);
+		pulldown.set(Options::ENABLE_DEFINITION_LIST, definition_list);
+		pulldown.set(Options::ENABLE_SUPERSCRIPT, superscript);
+		pulldown.set(Options::ENABLE_SUBSCRIPT, subscript);
+		pulldown.set(Options::ENABLE_WIKILINKS, wikilinks);
 
 		/* `ENABLE_OLD_FOOTNOTES` implies `ENABLE_FOOTNOTES`. Set them separately
 		 * to not disable `ENABLE_FOOTNOTES` if `ENABLE_OLD_FOOTNOTES` is false. */
-		if from.old_footnotes {
-			result.insert(Options::ENABLE_OLD_FOOTNOTES);
-		} else if from.footnotes {
-			result.insert(Options::ENABLE_FOOTNOTES);
-		}
+		if old_footnotes { pulldown.insert(Options::ENABLE_OLD_FOOTNOTES); }
+		else if footnotes { pulldown.insert(Options::ENABLE_FOOTNOTES); }
 
-		result
+		Self { pulldown, highlight }
 	}
 }
 
-// #[pyclass(name = "Config")]
-// #[derive(Clone, Copy)]
-// struct PyConfig {
-// 	#[pyo3(flatten)]
-// 	options: PyOptions,
-// }
-
-/// Wrapper around `pulldown_cmark::Parser` to highlight syntax and render math.
-struct EventIter<'a> {
-	/// The parser whose events to iterate over.
-	parser: Parser<'a>,
-	/// Whether to render math.
-	math: bool,
-	/// Whether to highlight syntax.
-	highlight: bool,
+impl PyOptions {
+	fn empty() -> Self {
+		Self {
+			pulldown: Options::empty(),
+			highlight: false,
+		}
+	}
 }
 
-impl<'a> EventIter<'a> {
+impl Default for PyOptions {
+	fn default() -> Self {
+		Self::empty()
+	}
+}
+
+/// Wrapper around `pulldown_cmark::Parser` to highlight syntax and render math.
+struct EventIter<'p, 'o> {
+	parser: Parser<'p>,
+	options: &'o PyOptions,
+}
+
+impl<'p, 'o> EventIter<'p, 'o> {
 	/// Create a new `EventIter`.
-	pub fn new(parser: Parser<'a>, math: bool, highlight: bool) -> Self {
-		Self {
-			parser,
-			math,
-			highlight,
-		}
+	pub fn new(parser: Parser<'p>, options: &'o PyOptions) -> Self {
+		Self { parser, options }
 	}
 
 	/// Handle a fenced codeblock: highlight syntax if a language is specified, else escape HTML.
-	fn codeblock(parser: &mut Parser<'a>, language: &str) -> Result<Event<'a>, Fatal> {
+	fn codeblock(parser: &mut Parser<'p>, language: &str) -> Result<Event<'p>, Fatal> {
 		let mut code = String::new();
-
 		for event in parser.by_ref() {
 			match event {
 				Event::Text(text) => code.push_str(&text),
@@ -237,18 +203,12 @@ impl<'a> EventIter<'a> {
 			None => String::from(encode_safe(&code)),
 		};
 
-		let result = format!("<pre><code{class}>{result}</code></pre>");
-
-		Ok(Event::Html(result.into()))
+		Ok(Event::Html(format!("<pre><code{class}>{result}</code></pre>").into()))
 	}
 
 	/// Highlight a string of code, given a syntax.
 	fn codeblock_impl(code: &str, syntax: &SyntaxReference) -> Result<String, Fatal> {
-		let mut highlighter = ClassedHTMLGenerator::new_with_class_style(
-			syntax,
-			&SYNTAXES,
-			ClassStyle::Spaced,
-		);
+		let mut highlighter = ClassedHTMLGenerator::new_with_class_style(syntax, &SYNTAXES, ClassStyle::Spaced);
 
 		for line in LinesWithEndings::from(code) {
 			highlighter
@@ -260,7 +220,7 @@ impl<'a> EventIter<'a> {
 	}
 
 	/// Render a math expression, inline or display, into MathML.
-	fn math(math: &str, display: bool) -> Result<Event<'a>, Fatal> {
+	fn math(math: &str, display: bool) -> Result<Event<'p>, Fatal> {
 		let opts = Opts::builder()
 			.display_mode(display)
 			.output_type(OutputType::Mathml)
@@ -273,21 +233,23 @@ impl<'a> EventIter<'a> {
 	}
 }
 
-impl<'a> Iterator for EventIter<'a> {
-	type Item = Result<Event<'a>, Fatal>;
+impl<'p, 'o> Iterator for EventIter<'p, 'o> {
+	type Item = Result<Event<'p>, Fatal>;
 
 	/// Advance the iterator, and intercept codeblocks and math expressions.
-	#[rustfmt::skip]
 	fn next(&mut self) -> Option<Self::Item> {
 		Some(match self.parser.next()? {
-			Event::InlineMath(math) if self.math
-				=> Self::math(&math, false),
+			Event::InlineMath(math) if self.options.pulldown.contains(Options::ENABLE_MATH) => {
+				Self::math(&math, false)
+			}
 
-			Event::DisplayMath(math) if self.math
-				=> Self::math(&math, true),
+			Event::DisplayMath(math) if self.options.pulldown.contains(Options::ENABLE_MATH) => {
+				Self::math(&math, true)
+			}
 
-			Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language))) if self.highlight
-				=> Self::codeblock(&mut self.parser, &language),
+			Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language))) if self.options.highlight => {
+				Self::codeblock(&mut self.parser, &language)
+			}
 
 			default => Ok(default),
 		})
@@ -321,15 +283,11 @@ fn css(theme: String) -> PyResult<String> {
 		.get(theme.as_str())
 		.ok_or(Fatal::UnknownTheme { theme })?;
 
-	let theme = THEMES
-		.themes
-		.get(canonical)
-		.ok_or_else(|| Fatal::MissingTheme {
-			theme: canonical.into(),
-		})?;
+	let theme = THEMES.themes.get(canonical).ok_or_else(|| Fatal::MissingTheme {
+		theme: canonical.into(),
+	})?;
 
-	Ok(css_for_theme_with_class_style(theme, ClassStyle::Spaced)
-		.map_err(|_| Fatal::CannotGetCss)?)
+	Ok(css_for_theme_with_class_style(theme, ClassStyle::Spaced).map_err(|_| Fatal::CannotGetCss)?)
 }
 
 /// Render a list of Markdown strings into a list of HTML strings.
@@ -339,9 +297,7 @@ fn css(theme: String) -> PyResult<String> {
 /// markdown
 ///     A list of Markdown strings to render.
 /// options
-///     The `pulldown_cmark` extensions to enable.
-/// highlight
-///     Whether to highlight syntax in codeblocks.
+///     The Markdown extensions to enable.
 ///
 /// Returns
 /// -------
@@ -358,25 +314,17 @@ fn css(theme: String) -> PyResult<String> {
 /// UnknownLanguageError
 ///    If an unknown language is used to open a code block.
 #[pyfunction]
-#[pyo3(signature = (markdown, options = None, *, highlight = false))]
-fn render(
-	markdown: &Bound<'_, PyList>,
-	options: Option<PyOptions>,
-	highlight: bool,
-) -> PyResult<Vec<String>> {
-	let options = options
-		.map(|py_options| py_options.into())
-		.unwrap_or(Options::empty());
-
+#[pyo3(signature = (markdown, options = None))]
+fn render(markdown: &Bound<'_, PyList>, options: Option<PyOptions>) -> PyResult<Vec<String>> {
+	let options = options.unwrap_or_default();
 	let mut result = Vec::with_capacity(markdown.len());
 
 	for entry in markdown.iter() {
 		let buffer: &str = entry.extract()?;
-		let parser = Parser::new_ext(buffer, options);
-		let iter =
-			EventIter::new(parser, options.contains(Options::ENABLE_MATH), highlight);
-		let mut html = String::with_capacity(buffer.len());
+		let parser = Parser::new_ext(buffer, options.pulldown);
+		let iter = EventIter::new(parser, &options);
 
+		let mut html = String::with_capacity(buffer.len());
 		process_results(iter, |events| {
 			push_html(&mut html, events);
 		})?;
@@ -388,15 +336,18 @@ fn render(
 }
 
 /// A Python wrapper around `pulldown-cmark` which can highlight syntax and render math.
-#[rustfmt::skip]
 #[pymodule]
 fn pulldown_cmark(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-	let themes = THEME_NICKNAMES.keys().map(|x| String::from(*x)).collect::<Vec<String>>();
+	/* Constant attribute to permit theme configuration validation. */
+	let themes = THEME_NICKNAMES
+		.keys()
+		.map(|x| String::from(*x))
+		.collect::<Vec<String>>();
 
 	m.add_class::<PyOptions>()?;
 	m.add_function(wrap_pyfunction!(css, m)?)?;
 	m.add_function(wrap_pyfunction!(render, m)?)?;
-	m.add("THEMES", themes)?; /* Constant attribute to permit theme configuration validation. */
+	m.add("THEMES", themes)?;
 	m.add("PulldownCmarkError", py.get_type::<PulldownCmarkError>())?;
 	m.add("CannotRenderMathError", py.get_type::<CannotRenderMathError>())?;
 	m.add("CannotConfigMathError", py.get_type::<CannotConfigMathError>())?;
@@ -405,5 +356,6 @@ fn pulldown_cmark(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 	m.add("UnknownLanguageError", py.get_type::<UnknownLanguageError>())?;
 	m.add("UnknownThemeError", py.get_type::<UnknownThemeError>())?;
 	m.add("MissingThemeError", py.get_type::<MissingThemeError>())?;
+
 	Ok(())
 }
