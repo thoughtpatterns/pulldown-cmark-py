@@ -14,6 +14,7 @@ class Options:
     superscript: bool
     subscript: bool
     wikilinks: bool
+    highlight: bool
 
     def __init__(
         self,
@@ -33,6 +34,7 @@ class Options:
         superscript: bool = False,
         subscript: bool = False,
         wikilinks: bool = False,
+        highlight: bool = False,
     ) -> None: ...
 
 def css(theme: str) -> str: ...
