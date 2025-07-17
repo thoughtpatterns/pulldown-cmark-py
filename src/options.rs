@@ -36,7 +36,7 @@ use pyo3::prelude::*;
 /// wikilinks
 ///     Render Obsidian-style wikilinks.
 /// highlight [2]
-///     Highlight syntax in codeblocks.
+///     Render highlighted syntax in codeblocks.
 ///
 /// [0]: Front matter blocks are *not* parsed for data. These flags simply let
 ///      the parser skip them without error.
@@ -46,8 +46,8 @@ use pyo3::prelude::*;
 #[pyclass(name = "Options")]
 #[derive(Clone, Copy)]
 pub struct PyOptions {
-	pulldown: Options,
-	highlight: bool,
+	pub pulldown: Options,
+	pub highlight: bool,
 }
 
 #[pymethods]
@@ -97,24 +97,32 @@ impl PyOptions {
 	) -> Self {
 		let mut pulldown = Options::empty();
 
-		pulldown.set(Options::ENABLE_TABLES, tables);
-		pulldown.set(Options::ENABLE_STRIKETHROUGH, strikethrough);
-		pulldown.set(Options::ENABLE_TASKLISTS, tasklists);
-		pulldown.set(Options::ENABLE_SMART_PUNCTUATION, smart_punctuation);
-		pulldown.set(Options::ENABLE_HEADING_ATTRIBUTES, heading_attributes);
-		pulldown.set(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS, yaml_style_metadata_blocks);
-		pulldown.set(Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS, pluses_delimited_metadata_blocks);
-		pulldown.set(Options::ENABLE_MATH, math);
-		pulldown.set(Options::ENABLE_GFM, gfm);
-		pulldown.set(Options::ENABLE_DEFINITION_LIST, definition_list);
-		pulldown.set(Options::ENABLE_SUPERSCRIPT, superscript);
-		pulldown.set(Options::ENABLE_SUBSCRIPT, subscript);
-		pulldown.set(Options::ENABLE_WIKILINKS, wikilinks);
+		for (option, switch) in [
+			(Options::ENABLE_TABLES, tables),
+			(Options::ENABLE_STRIKETHROUGH, strikethrough),
+			(Options::ENABLE_TASKLISTS, tasklists),
+			(Options::ENABLE_SMART_PUNCTUATION, smart_punctuation),
+			(Options::ENABLE_HEADING_ATTRIBUTES, heading_attributes),
+			(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS, yaml_style_metadata_blocks),
+			(Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS, pluses_delimited_metadata_blocks),
+			(Options::ENABLE_MATH, math),
+			(Options::ENABLE_GFM, gfm),
+			(Options::ENABLE_DEFINITION_LIST, definition_list),
+			(Options::ENABLE_SUPERSCRIPT, superscript),
+			(Options::ENABLE_SUBSCRIPT, subscript),
+			(Options::ENABLE_WIKILINKS, wikilinks),
+		] {
+			pulldown.set(option, switch);
+		}
 
-		/* `ENABLE_OLD_FOOTNOTES` implies `ENABLE_FOOTNOTES`. Set them separately
-		 * to not disable `ENABLE_FOOTNOTES` if `ENABLE_OLD_FOOTNOTES` is false. */
-		if old_footnotes { pulldown.insert(Options::ENABLE_OLD_FOOTNOTES); }
-		else if footnotes { pulldown.insert(Options::ENABLE_FOOTNOTES); }
+		/* The `ENABLE_OLD_FOOTNOTES` bitflag implies `ENABLE_FOOTNOTES`. Set them
+		 * separately to not disable `ENABLE_FOOTNOTES` if `ENABLE_OLD_FOOTNOTES` is
+		 * false. */
+		match (old_footnotes, footnotes) {
+			(true, _) => pulldown.insert(Options::ENABLE_OLD_FOOTNOTES),
+			(false, true) => pulldown.insert(Options::ENABLE_FOOTNOTES),
+			_ => (),
+		}
 
 		Self { pulldown, highlight }
 	}
