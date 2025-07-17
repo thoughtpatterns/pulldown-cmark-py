@@ -22,6 +22,6 @@ The `Options` class is provided to configure `render`.
 ## To-do
 
 - Provide full configuration for `katex`, which would provide macro support,
-  safety control, etc..
+  safety control, etc.
 - Provide full configuration for `syntect`, which would allow inline color CSS
   and CSS class namespaces.
