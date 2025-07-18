@@ -22,13 +22,13 @@ use syntect::{
 static THEMES: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
 static THEME_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
 	HashMap::from([
-		("base16-eighties.dark", "base16-eighties.dark"),
-		("base16-mocha.dark", "base16-mocha.dark"),
-		("base16-ocean.dark", "base16-ocean.dark"),
-		("base16-ocean.light", "base16-ocean.light"),
-		("inspired-github.light", "InspiredGitHub"),
-		("solarized.dark", "Solarized (dark)"),
-		("solarized.light", "Solarized (light)"),
+		("base16-eighties-dark", "base16-eighties.dark"),
+		("base16-mocha-dark", "base16-mocha.dark"),
+		("base16-ocean-dark", "base16-ocean.dark"),
+		("base16-ocean-light", "base16-ocean.light"),
+		("inspired-github-light", "InspiredGitHub"),
+		("solarized-dark", "Solarized (dark)"),
+		("solarized-light", "Solarized (light)"),
 	])
 });
 

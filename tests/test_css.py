@@ -7,20 +7,11 @@
 
 from pathlib import Path
 
-from pulldown_cmark import css
+from pulldown_cmark import THEMES, css
 
 
 class TestCss:
     def test_css(self) -> None:
         assets = Path(__file__).parent / "assets"
-
-        for theme in (
-            "base16-eighties.dark",
-            "base16-mocha.dark",
-            "base16-ocean.dark",
-            "base16-ocean.light",
-            "inspired-github.light",
-            "solarized.dark",
-            "solarized.light",
-        ):
+        for theme in THEMES:
             assert css(theme) == Path(assets / f"{theme}.css").read_text()
