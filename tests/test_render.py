@@ -17,8 +17,6 @@ class TestRender:
         html: str,
         markdown: str,
         options: Options | None = None,
-        *,
-        highlight: bool = False,
     ) -> None:
         """Test the output of render() against a static string.
 
@@ -41,7 +39,7 @@ class TestRender:
         html = normalize(html)
 
         markdown = dedent(markdown)
-        markdown = render([markdown], options, highlight=highlight)[0]
+        markdown = render([markdown], options)[0]
         markdown = normalize(markdown)
 
         assert html == markdown
@@ -477,7 +475,7 @@ class TestRender:
         ```
         """
 
-        TestRender.assert_render(html, markdown, highlight=True)
+        TestRender.assert_render(html, markdown, Options(highlight=True))
 
     def test_highlight_rust(self) -> None:
         html = """
@@ -497,4 +495,4 @@ class TestRender:
         ```
         """
 
-        TestRender.assert_render(html, markdown, highlight=True)
+        TestRender.assert_render(html, markdown, Options(highlight=True))
