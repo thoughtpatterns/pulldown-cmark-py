@@ -27,7 +27,7 @@ class TestRender:
             soup = BeautifulSoup(string, "lxml")
 
             for node in soup.find_all(string=True):
-                if node.parent and node.parent.name in ("pre", "code", "textare"):
+                if node.parent and node.parent.name in ("pre", "code", "textarea"):
                     continue  # Whitespace-sensitive tag bodies should not be stripped.
 
                 text = NavigableString(" ".join(cast("str", node).split()))
@@ -47,26 +47,26 @@ class TestRender:
     def test_tables(self) -> None:
         html = """
         <table>
-         <thead>
-          <tr>
-           <th>
-            foo
-           </th>
-           <th>
-            bar
-           </th>
-          </tr>
-         </thead>
-         <tbody>
-          <tr>
-           <td>
-            baz
-           </td>
-           <td>
-            qux
-           </td>
-          </tr>
-         </tbody>
+          <thead>
+            <tr>
+              <th>
+                foo
+              </th>
+              <th>
+                bar
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                baz
+              </td>
+              <td>
+                qux
+              </td>
+            </tr>
+          </tbody>
         </table>
         """
 
@@ -81,54 +81,54 @@ class TestRender:
     def test_footnotes(self) -> None:
         html = """
         <p>
-         foo
-         <sup class="footnote-reference">
-          <a href="#1">
-           1
-          </a>
-         </sup>
-         bar
-         <sup class="footnote-reference">
-          <a href="#2">
-           2
-          </a>
-         </sup>
-         qux[^4]
+          foo
+          <sup class="footnote-reference">
+            <a href="#1">
+              1
+            </a>
+          </sup>
+          bar
+          <sup class="footnote-reference">
+            <a href="#2">
+              2
+            </a>
+          </sup>
+          qux[^4]
         </p>
         <p>
-         baz
-         <sup class="footnote-reference">
-          <a href="#3">
-           3
-          </a>
-         </sup>
+          baz
+          <sup class="footnote-reference">
+            <a href="#3">
+              3
+            </a>
+          </sup>
         </p>
         <div class="footnote-definition" id="1">
-         <sup class="footnote-definition-label">
-          1
-         </sup>
-         <p>
-          foo
-         </p>
+          <sup class="footnote-definition-label">
+            1
+          </sup>
+          <p>
+            foo
+          </p>
         </div>
         <div class="footnote-definition" id="2">
-         <sup class="footnote-definition-label">
-          2
-         </sup>
-         <p>
-          bar
-         </p>
+          <sup class="footnote-definition-label">
+            2
+          </sup>
+          <p>
+            bar
+          </p>
         </div>
         <div class="footnote-definition" id="3">
-         <sup class="footnote-definition-label">
-          3
-         </sup>
-         <p>
-          baz
-         </p>
+          <sup class="footnote-definition-label">
+            3
+          </sup>
+          <p>
+            baz
+          </p>
         </div>
         <p>
-         quux
+          quux
         </p>
         """
 
@@ -150,9 +150,9 @@ class TestRender:
     def test_strikethrough(self) -> None:
         html = """
         <p>
-         <del>
-          foo
-         </del>
+          <del>
+            foo
+          </del>
         </p>
         """
 
@@ -165,14 +165,14 @@ class TestRender:
     def test_tasklists(self) -> None:
         html = """
         <ul>
-         <li>
-          <input disabled="" type="checkbox"/>
-          foo
-         </li>
-         <li>
-          <input checked="" disabled="" type="checkbox"/>
-          bar
-         </li>
+          <li>
+            <input disabled type="checkbox">
+            foo
+          </li>
+          <li>
+            <input checked disabled type="checkbox">
+            bar
+          </li>
         </ul>
         """
 
@@ -186,9 +186,9 @@ class TestRender:
     def test_smart_punctuation(self) -> None:
         html = """
         <p>
-         ‘foo’ “bar” baz–qux
+          &lsquo;foo&rsquo; &ldquo;bar&rdquo; baz&ndash;qux
         </p>
-        """  # noqa: RUF001
+        """
 
         markdown = """
         'foo' "bar" baz--qux
@@ -199,7 +199,7 @@ class TestRender:
     def test_heading_attributes(self) -> None:
         html = """
         <h1 class="baz" id="bar">
-         foo
+          foo
         </h1>
         """
 
@@ -212,59 +212,59 @@ class TestRender:
     def test_old_footnotes(self) -> None:
         html = """
         <p>
-         foo
-         <sup class="footnote-reference">
-          <a href="#1">
-           1
-          </a>
-         </sup>
-         bar
-         <sup class="footnote-reference">
-          <a href="#2">
-           2
-          </a>
-         </sup>
-         qux
-         <sup class="footnote-reference">
-          <a href="#4">
-           3
-          </a>
-         </sup>
+          foo
+          <sup class="footnote-reference">
+            <a href="#1">
+              1
+            </a>
+          </sup>
+          bar
+          <sup class="footnote-reference">
+            <a href="#2">
+              2
+            </a>
+          </sup>
+          qux
+          <sup class="footnote-reference">
+            <a href="#4">
+              3
+            </a>
+          </sup>
         </p>
         <p>
-         baz
-         <sup class="footnote-reference">
-          <a href="#3">
-           4
-          </a>
-         </sup>
+          baz
+          <sup class="footnote-reference">
+            <a href="#3">
+              4
+            </a>
+          </sup>
         </p>
         <div class="footnote-definition" id="1">
-         <sup class="footnote-definition-label">
-          1
-         </sup>
-         <p>
-          foo
-         </p>
+          <sup class="footnote-definition-label">
+            1
+          </sup>
+          <p>
+            foo
+          </p>
         </div>
         <div class="footnote-definition" id="2">
-         <sup class="footnote-definition-label">
-          2
-         </sup>
-         <p>
-          bar
-         </p>
+          <sup class="footnote-definition-label">
+            2
+          </sup>
+          <p>
+            bar
+          </p>
         </div>
         <div class="footnote-definition" id="3">
-         <sup class="footnote-definition-label">
-          4
-         </sup>
-         <p>
-          baz
-         </p>
+          <sup class="footnote-definition-label">
+            4
+          </sup>
+          <p>
+            baz
+          </p>
         </div>
         <p>
-         quux
+          quux
         </p>
         """
 
@@ -286,78 +286,78 @@ class TestRender:
     def test_math(self) -> None:
         html = r"""
         <p>
-         <span class="katex">
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-           <semantics>
-            <mrow>
-             <msup>
-              <mi>
-               x
-              </mi>
-              <mn>
-               2
-              </mn>
-             </msup>
-             <mo>
-              +
-             </mo>
-             <msup>
-              <mi>
-               y
-              </mi>
-              <mn>
-               2
-              </mn>
-             </msup>
-             <mo>
-              =
-             </mo>
-             <mn>
-              1
-             </mn>
-            </mrow>
-            <annotation encoding="application/x-tex">
-             x^2 + y^2 = 1
-            </annotation>
-           </semantics>
-          </math>
-         </span>
-         <span class="katex">
-          <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-           <semantics>
-            <mrow>
-             <msubsup>
-              <mo>
-               ∫
-              </mo>
-              <mn>
-               0
-              </mn>
-              <mn>
-               1
-              </mn>
-             </msubsup>
-             <msup>
-              <mi>
-               x
-              </mi>
-              <mn>
-               2
-              </mn>
-             </msup>
-             <mi mathvariant="normal">
-              d
-             </mi>
-             <mi>
-              x
-             </mi>
-            </mrow>
-            <annotation encoding="application/x-tex">
-             \int_0^1 x^2 \mathrm{d}x
-            </annotation>
-           </semantics>
-          </math>
-         </span>
+          <span class="katex">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">
+              <semantics>
+                <mrow>
+                  <msup>
+                    <mi>
+                      x
+                    </mi>
+                    <mn>
+                      2
+                    </mn>
+                  </msup>
+                  <mo>
+                    +
+                  </mo>
+                  <msup>
+                    <mi>
+                      y
+                    </mi>
+                    <mn>
+                      2
+                    </mn>
+                  </msup>
+                  <mo>
+                    =
+                  </mo>
+                  <mn>
+                    1
+                  </mn>
+                </mrow>
+                <annotation encoding="application/x-tex">
+                  x^2 + y^2 = 1
+                </annotation>
+              </semantics>
+            </math>
+          </span>
+          <span class="katex">
+            <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+              <semantics>
+                <mrow>
+                  <msubsup>
+                    <mo>
+                      &int;
+                    </mo>
+                    <mn>
+                      0
+                    </mn>
+                    <mn>
+                      1
+                    </mn>
+                  </msubsup>
+                  <msup>
+                    <mi>
+                      x
+                    </mi>
+                    <mn>
+                      2
+                    </mn>
+                  </msup>
+                  <mi mathvariant="normal">
+                    d
+                  </mi>
+                  <mi>
+                    x
+                  </mi>
+                </mrow>
+                <annotation encoding="application/x-tex">
+                  \int_0^1 x^2 \mathrm{d}x
+                </annotation>
+              </semantics>
+            </math>
+          </span>
         </p>
         """
 
@@ -371,9 +371,9 @@ class TestRender:
     def test_gfm(self) -> None:
         html = """
         <blockquote class="markdown-alert-note">
-         <p>
-          foo
-         </p>
+          <p>
+            foo
+          </p>
         </blockquote>
         """
 
@@ -387,18 +387,18 @@ class TestRender:
     def test_definition_list(self) -> None:
         html = """
         <dl>
-         <dt>
-          foo
-         </dt>
-         <dd>
-          bar
-         </dd>
-         <dt>
-          baz
-         </dt>
-         <dd>
-          qux
-         </dd>
+          <dt>
+            foo
+          </dt>
+          <dd>
+            bar
+          </dd>
+          <dt>
+            baz
+          </dt>
+          <dd>
+            qux
+          </dd>
         </dl>
         """
 
@@ -415,9 +415,9 @@ class TestRender:
     def test_superscript(self) -> None:
         html = """
         <p>
-         <sup>
-          foo
-         </sup>
+          <sup>
+            foo
+          </sup>
         </p>
         """
 
@@ -430,9 +430,9 @@ class TestRender:
     def test_subscript(self) -> None:
         html = """
         <p>
-         <sub>
-          foo
-         </sub>
+          <sub>
+            foo
+          </sub>
         </p>
         """
 
@@ -445,9 +445,9 @@ class TestRender:
     def test_wikilinks(self) -> None:
         html = """
         <p>
-         <a href="foo">
-          foo
-         </a>
+          <a href="foo">
+            foo
+          </a>
         </p>
         """
 
@@ -460,11 +460,11 @@ class TestRender:
     def test_highlight_none(self) -> None:
         html = """
         <html>
-         <body>
-          <pre><code>let x
+          <body>
+            <pre><code>let x
             = 1;
         </code></pre>
-         </body>
+          </body>
         </html>
         """
 
@@ -480,11 +480,11 @@ class TestRender:
     def test_highlight_rust(self) -> None:
         html = """
         <html>
-         <body>
-          <pre><code class="language-rust"><span class="source rust"><span class="storage type rust">let</span> x
+          <body>
+            <pre><code class="language-rust"><span class="source rust"><span class="storage type rust">let</span> x
             <span class="keyword operator rust">=</span> <span class="constant numeric integer decimal rust">1</span><span class="punctuation terminator rust">;</span>
         </span></code></pre>
-         </body>
+          </body>
         </html>
         """  # noqa: E501
 
