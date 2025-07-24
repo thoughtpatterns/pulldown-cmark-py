@@ -51,7 +51,7 @@ fn render(py: Python, markdown: &Bound<'_, PyList>, options: Option<&PyOptions>)
 	})
 }
 
-/// An configurable Python wrapper around `pulldown-cmark`.
+/// A configurable Python wrapper around `pulldown-cmark`.
 #[pymodule]
 fn pulldown_cmark(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 	m.add_class::<PyOptions>()?;
