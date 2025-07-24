@@ -43,10 +43,10 @@ pub struct Callbacks {
 ///     Render Obsidian-style wikilinks.
 /// math
 ///     A callback function with which to filter math delimited by `$` or `$$`,
-///     of form `def f(buffer: str, display: bool, /) -> str`.
+///     of signature `def f(buffer: str, display: bool) -> str`.
 /// code
-///     A callback function with which to filter code, of form
-///     `def f(buffer: str, language: str | None, /) -> str`.
+///     A callback function with which to filter code, of signature
+///     `def f(buffer: str, language: str | None) -> str`.
 ///
 /// [0]: Front matter blocks are *not* parsed for data. These flags simply let
 ///      the parser skip them without error.
