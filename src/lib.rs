@@ -1,5 +1,9 @@
+// TODO: just make the math/highlight stuff a python callback!
+
 mod error;
+mod highlight;
 mod iter;
+mod modules;
 mod options;
 
 use crate::error::{
@@ -11,25 +15,23 @@ use crate::options::PyOptions;
 use ::pulldown_cmark::{Parser, html::push_html};
 use itertools::process_results;
 use once_cell::sync::Lazy;
+use pyo3::types::PyIterator;
 use pyo3::{Python, prelude::*, types::PyList, wrap_pyfunction};
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use syntect::{
 	highlighting::ThemeSet,
 	html::{ClassStyle, css_for_theme_with_class_style},
 };
 
-static THEMES: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
-static THEME_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
-	HashMap::from([
-		("base16-eighties-dark", "base16-eighties.dark"),
-		("base16-mocha-dark", "base16-mocha.dark"),
-		("base16-ocean-dark", "base16-ocean.dark"),
-		("base16-ocean-light", "base16-ocean.light"),
-		("inspired-github-light", "InspiredGitHub"),
-		("solarized-dark", "Solarized (dark)"),
-		("solarized-light", "Solarized (light)"),
-	])
+static THEMES: Lazy<PyResult<HashSet<String>>> = Lazy::new(|| {
+	Python::with_gil(|py| {
+		PyModule::import(py, "pygments.styles")?
+			.getattr("STYLE_MAP")?
+			.getattr("keys")?
+			.call0()?
+			.extract()
+	})
 });
 
 /// Get a CSS string for a given theme.
@@ -55,12 +57,8 @@ static THEME_ALIASES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
 #[pyfunction]
 #[pyo3(signature = (theme))]
 fn css(theme: &str) -> PyResult<String> {
-	let canonical = *THEME_ALIASES.get(theme).ok_or(Fatal::UnknownTheme {
+	let theme = THEMES.get(theme).ok_or_else(|| Fatal::MissingTheme {
 		theme: String::from(theme),
-	})?;
-
-	let theme = THEMES.themes.get(canonical).ok_or_else(|| Fatal::MissingTheme {
-		theme: String::from(canonical),
 	})?;
 
 	let result = css_for_theme_with_class_style(theme, ClassStyle::Spaced)
