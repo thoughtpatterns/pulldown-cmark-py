@@ -18,15 +18,15 @@ use pyo3::prelude::*;
 /// heading_attributes
 ///     Render custom IDs and classes for headings.
 /// yaml_style_metadata_blocks [0]
-///     Skip YAML-style front matter blocks, which start with `---` and end with `---` or `...`.
+///     Skip YAML-style front matter blocks, which start with `---` and end with
+///     `---` or `...`.
 /// pluses_delimited_metadata_blocks [0]
 ///     Skip TOML-style front matter blocks, which start and end with `+++`.
 /// old_footnotes [1]
 ///     Render vanilla-Markdown-style footnotes.
-/// math [2]
-///     Render LaTeX, delimited with `$` for inline or `$$` for display.
 /// gfm
-///     Render blockquote tags: [!NOTE], [!TIP], [!IMPORTANT], [!WARNING], and [!CAUTION].
+///     Render blockquote tags: [!NOTE], [!TIP], [!IMPORTANT], [!WARNING], and
+///     [!CAUTION].
 /// definition_list
 ///     Render `commonmark-hs/commonmark-extensions` definition lists.
 /// superscript
@@ -35,19 +35,21 @@ use pyo3::prelude::*;
 ///     Render subscript (`~text~`).
 /// wikilinks
 ///     Render Obsidian-style wikilinks.
-/// highlight [2]
-///     Render highlighted syntax in codeblocks.
+/// math
+///     A callback function with which to filter math delimited by `$` or `$$`,
+///     of form `def f(math: str, display: bool, /) -> str`.
+/// code
+///     A callback function with which to filter code, of form
+///     `def f(code: str, language: str | None, /) -> str`.
 ///
 /// [0]: Front matter blocks are *not* parsed for data. These flags simply let
 ///      the parser skip them without error.
 /// [1]: `pulldown-cmark` will enable `footnotes` if `old-footnotes` is true.
-/// [2]: `pulldown-cmark` does not render math or highlight syntax; these are
-///      extensions.
 #[pyclass(name = "Options")]
-#[derive(Clone, Copy)]
 pub struct PyOptions {
-	pub pulldown: Options,
-	pub highlight: bool,
+	pub flags: Options,
+	pub math: Option<PyObject>,
+	pub code: Option<PyObject>,
 }
 
 #[pymethods]
@@ -67,16 +69,15 @@ impl PyOptions {
 	        yaml_style_metadata_blocks = false,
 	        pluses_delimited_metadata_blocks = false,
 		old_footnotes = false,
-		math = false,
 		gfm = false,
 		definition_list = false,
 		superscript = false,
 		subscript = false,
 		wikilinks = false,
-		highlight = false,
+		math = None,
+		code = None,
 	))]
 	#[allow(clippy::too_many_arguments)]
-	#[rustfmt::skip]
 	fn new(
 		tables: bool,
 		footnotes: bool,
@@ -87,49 +88,50 @@ impl PyOptions {
 		yaml_style_metadata_blocks: bool,
 		pluses_delimited_metadata_blocks: bool,
 		old_footnotes: bool,
-		math: bool,
 		gfm: bool,
 		definition_list: bool,
 		superscript: bool,
 		subscript: bool,
 		wikilinks: bool,
-		highlight: bool,
+		math: Option<PyObject>,
+		code: Option<PyObject>,
 	) -> Self {
-		let mut pulldown = Options::empty();
+		let mut flags = Options::empty();
 
-		for (option, switch) in [
-			(Options::ENABLE_TABLES, tables),
-			(Options::ENABLE_STRIKETHROUGH, strikethrough),
-			(Options::ENABLE_TASKLISTS, tasklists),
-			(Options::ENABLE_SMART_PUNCTUATION, smart_punctuation),
-			(Options::ENABLE_HEADING_ATTRIBUTES, heading_attributes),
-			(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS, yaml_style_metadata_blocks),
-			(Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS, pluses_delimited_metadata_blocks),
-			(Options::ENABLE_MATH, math),
-			(Options::ENABLE_GFM, gfm),
-			(Options::ENABLE_DEFINITION_LIST, definition_list),
-			(Options::ENABLE_SUPERSCRIPT, superscript),
-			(Options::ENABLE_SUBSCRIPT, subscript),
-			(Options::ENABLE_WIKILINKS, wikilinks),
-		] {
-			pulldown.set(option, switch);
+		macro_rules! flag_map {
+			{ $( $switch:expr => $flag:expr),* $(,)? } => {
+				$( if $switch { flags.insert($flag) } )*
+			};
 		}
 
-		/* The `ENABLE_OLD_FOOTNOTES` bitflag implies `ENABLE_FOOTNOTES`. Set them
-		 * separately to not disable `ENABLE_FOOTNOTES` if `ENABLE_OLD_FOOTNOTES` is
-		 * false. */
-		if old_footnotes { pulldown.insert(Options::ENABLE_OLD_FOOTNOTES) }
-		else if footnotes { pulldown.insert(Options::ENABLE_FOOTNOTES) }
+		flag_map! {
+			tables => Options::ENABLE_TABLES,
+			footnotes => Options::ENABLE_FOOTNOTES,
+			strikethrough => Options::ENABLE_STRIKETHROUGH,
+			tasklists => Options::ENABLE_TASKLISTS,
+			smart_punctuation => Options::ENABLE_SMART_PUNCTUATION,
+			heading_attributes => Options::ENABLE_HEADING_ATTRIBUTES,
+			yaml_style_metadata_blocks => Options::ENABLE_YAML_STYLE_METADATA_BLOCKS,
+			pluses_delimited_metadata_blocks => Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS,
+			old_footnotes => Options::ENABLE_OLD_FOOTNOTES,
+			gfm => Options::ENABLE_GFM,
+			definition_list => Options::ENABLE_DEFINITION_LIST,
+			superscript => Options::ENABLE_SUPERSCRIPT,
+			subscript => Options::ENABLE_SUBSCRIPT,
+			wikilinks => Options::ENABLE_WIKILINKS,
+			math.is_some() => Options::ENABLE_MATH,
+		}
 
-		Self { pulldown, highlight }
+		Self { flags, math, code }
 	}
 }
 
 impl Default for PyOptions {
 	fn default() -> Self {
 		Self {
-			pulldown: Options::empty(),
-			highlight: false,
+			flags: Options::empty(),
+			math: None,
+			code: None,
 		}
 	}
 }
