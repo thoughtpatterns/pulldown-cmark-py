@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 class Options:
     tables: bool
     footnotes: bool
@@ -8,13 +10,13 @@ class Options:
     yaml_style_metadata_blocks: bool
     pluses_delimited_metadata_blocks: bool
     old_footnotes: bool
-    math: bool
     gfm: bool
     definition_list: bool
     superscript: bool
     subscript: bool
     wikilinks: bool
-    highlight: bool
+    math: Callable[[str, bool], str] | None
+    code: Callable[[str, str | None], str] | None
 
     def __init__(
         self,
@@ -28,25 +30,16 @@ class Options:
         yaml_style_metadata_blocks: bool = False,
         pluses_delimited_metadata_blocks: bool = False,
         old_footnotes: bool = False,
-        math: bool = False,
         gfm: bool = False,
         definition_list: bool = False,
         superscript: bool = False,
         subscript: bool = False,
         wikilinks: bool = False,
-        highlight: bool = False,
+        math: Callable[[str, bool], str] | None = None,
+        code: Callable[[str, str | None], str] | None = None,
     ) -> None: ...
 
-def css(theme: str) -> str: ...
-def render(markdown: list[str], options: Options | None = None) -> list[str]: ...
-
-THEMES: list[str]
-
 class PulldownCmarkError(Exception): ...
-class CannotRenderMathError(PulldownCmarkError): ...
-class CannotConfigMathError(PulldownCmarkError): ...
-class CannotHighlightError(PulldownCmarkError): ...
-class CannotGetCssError(PulldownCmarkError): ...
-class UnknownLanguageError(PulldownCmarkError): ...
-class UnknownThemeError(PulldownCmarkError): ...
-class MissingThemeError(PulldownCmarkError): ...
+class BadCallbackError(PulldownCmarkError): ...
+
+def render(markdown: list[str], options: Options | None = None) -> list[str]: ...

@@ -1,57 +1,112 @@
 use crate::error::Fatal;
-use crate::options::PyOptions;
-use ::pulldown_cmark::{CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd};
+use crate::options::Callbacks;
+use ::pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 use pyo3::prelude::*;
+use std::mem::take;
 
-/// Wrapper which extends `pulldown_cmark::Parser` with extensions.
-pub struct EventIter<'p, 'o> {
+#[derive(Default)]
+enum State {
+	#[default]
+	Default,
+	CodeBlock {
+		buffer: String,
+		language: String,
+	},
+}
+
+/// Wrapper which extends `pulldown_cmark::Parser` with callbacks.
+pub struct EventIter<'p, 'c> {
+	state: State,
 	parser: Parser<'p>,
-	options: &'o PyOptions,
+	callbacks: &'c Callbacks,
 }
 
-impl<'p, 'o> EventIter<'p, 'o> {
-	pub fn new(parser: Parser<'p>, options: &'o PyOptions) -> Self {
-		Self { parser, options }
+impl<'p, 'c> EventIter<'p, 'c> {
+	pub fn new(parser: Parser<'p>, callbacks: &'c Callbacks) -> Self {
+		Self {
+			parser,
+			state: State::default(),
+			callbacks,
+		}
 	}
+
+	fn math(&self, buffer: &str, display: bool) -> Result<Event<'p>, Fatal> {
+		/* `self.callbacks.math.unwrap()` is guaranteed, as this function is called
+		 * only if `self.callbacks.math.is_some()`. */
+		Python::with_gil(|py| {
+			let result = self.callbacks.math.as_ref().unwrap().call1(py, (buffer, display));
+			Ok(Event::Html(result?.extract::<String>(py)?.into()))
+		})
+	}
+
+	fn code(&self, buffer: &str, language: &str) -> Result<Event<'p>, Fatal> {
+		/* `self.callbacks.code.unwrap()` is guaranteed, as this function is called
+		 * only if `state == State::CodeBlock`, which in turn is reached only if
+		 * `self.callbacks.code.is_some()`. */
+		Python::with_gil(|py| {
+			let result = self.callbacks.code.as_ref().unwrap().call1(py, (buffer, language));
+			Ok(Event::Html(result?.extract::<String>(py)?.into()))
+		})
+	}
+
 }
 
-impl<'p, 'o> Iterator for EventIter<'p, 'o> {
+impl<'p, 'c> Iterator for EventIter<'p, 'c> {
 	type Item = Result<Event<'p>, Fatal>;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		let event = self.parser.next()?;
-
-		let result = match event {
-			Event::InlineMath(math) | Event::DisplayMath(math) => {
-				let display = matches!(event, Event::DisplayMath(_));
-
-				Python::with_gil(|py| {
-					let result = self.options.math.unwrap().call1(py, (math.as_ref(), display));
-					Ok(Event::Html(result.unwrap().extract::<String>(py).unwrap().into()))
-				})
-			}
-
-			Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language)))
-				if self.options.code.is_some() =>
-			{
-				let mut code = String::new();
-				for event in self {
-					match event {
-						Ok(Event::Text(text)) => code.push_str(&text),
-						Ok(Event::End(TagEnd::CodeBlock)) => break,
-						_ => (),
+		loop {
+			let event = match self.parser.next() {
+				Some(event) => event,
+				None => {
+					/* If we're in a codeblock, flush the buffer before we close the iterator. */
+					if let State::CodeBlock { buffer, language } = take(&mut self.state) {
+						return Some(self.code(&buffer, &language));
+					} else {
+						return None;
 					}
 				}
+			};
 
-				Python::with_gil(|py| {
-					let result = self.options.code.unwrap().call1(py, (&String::from(code), true));
-					Ok(Event::Html(result.unwrap().extract(py).unwrap().into()))
-				})
+			if let State::CodeBlock { buffer, language } = &mut self.state {
+				match event {
+					Event::End(TagEnd::CodeBlock) => {
+						let (buffer, language) = (take(buffer), take(language));
+						self.state = State::Default;
+						return Some(self.code(&buffer, &language));
+					}
+
+					Event::Text(text) => {
+						buffer.push_str(&text);
+						continue;
+					}
+
+					_ => continue,
+				}
 			}
 
-			default => Ok(default),
-		};
+			match event {
+				Event::InlineMath(math) if self.callbacks.math.is_some() => {
+					return Some(self.math(math.as_ref(), false));
+				}
 
-		Some(result)
+				Event::DisplayMath(math) if self.callbacks.math.is_some() => {
+					return Some(self.math(math.as_ref(), true));
+				}
+
+				Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(language)))
+					if self.callbacks.code.is_some() =>
+				{
+					self.state = State::CodeBlock {
+						buffer: String::new(),
+						language: String::from(language),
+					};
+
+					continue;
+				}
+
+				default => return Some(Ok(default)),
+			};
+		}
 	}
 }

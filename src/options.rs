@@ -1,6 +1,12 @@
 use ::pulldown_cmark::Options;
 use pyo3::prelude::*;
 
+#[derive(Default)]
+pub struct Callbacks {
+	pub math: Option<PyObject>,
+	pub code: Option<PyObject>,
+}
+
 /// Wraps `pulldown-cmark::Options` to configure CommonMark extensions.
 ///
 /// Parameters
@@ -37,10 +43,10 @@ use pyo3::prelude::*;
 ///     Render Obsidian-style wikilinks.
 /// math
 ///     A callback function with which to filter math delimited by `$` or `$$`,
-///     of form `def f(math: str, display: bool, /) -> str`.
+///     of form `def f(buffer: str, display: bool, /) -> str`.
 /// code
 ///     A callback function with which to filter code, of form
-///     `def f(code: str, language: str | None, /) -> str`.
+///     `def f(buffer: str, language: str | None, /) -> str`.
 ///
 /// [0]: Front matter blocks are *not* parsed for data. These flags simply let
 ///      the parser skip them without error.
@@ -48,8 +54,7 @@ use pyo3::prelude::*;
 #[pyclass(name = "Options")]
 pub struct PyOptions {
 	pub flags: Options,
-	pub math: Option<PyObject>,
-	pub code: Option<PyObject>,
+	pub callbacks: Callbacks,
 }
 
 #[pymethods]
@@ -122,7 +127,10 @@ impl PyOptions {
 			math.is_some() => Options::ENABLE_MATH,
 		}
 
-		Self { flags, math, code }
+		Self {
+			flags,
+			callbacks: Callbacks { math, code },
+		}
 	}
 }
 
@@ -130,8 +138,7 @@ impl Default for PyOptions {
 	fn default() -> Self {
 		Self {
 			flags: Options::empty(),
-			math: None,
-			code: None,
+			callbacks: Callbacks::default(),
 		}
 	}
 }

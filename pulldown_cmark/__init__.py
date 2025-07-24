@@ -1,31 +1,15 @@
-"""A wrapper around `pulldown-cmark` which can highlight syntax and render math."""
+"""A configurable wrapper around `pulldown-cmark`."""
 
 from .pulldown_cmark import (
-    THEMES,
-    CannotConfigMathError,
-    CannotGetCssError,
-    CannotHighlightError,
-    CannotRenderMathError,
-    MissingThemeError,
+    BadCallbackError,
     Options,
     PulldownCmarkError,
-    UnknownLanguageError,
-    UnknownThemeError,
-    css,
     render,
 )
 
 __all__ = [
-    "THEMES",
-    "CannotConfigMathError",
-    "CannotGetCssError",
-    "CannotHighlightError",
-    "CannotRenderMathError",
-    "MissingThemeError",
+    "BadCallbackError",
     "Options",
     "PulldownCmarkError",
-    "UnknownLanguageError",
-    "UnknownThemeError",
-    "css",
     "render",
 ]

@@ -34,6 +34,15 @@ wheels = [
 ]
 
 [[package]]
+name = "latex2mathml"
+version = "3.78.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/33/ad2c3929494ad160f5130ea132ca298627a6c81c70be6bedd1bc806b5b01/latex2mathml-3.78.0.tar.gz", hash = "sha256:712193aa4c6ade1a8e0145dac7bc1f9aafbd54f93046a2356a7e1c05fa0f8b31", size = 73737, upload-time = "2025-05-03T16:51:53.563Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/fd/aba08bb9e527168efad57985d7db9a853eb2384b1efa5ca5f3a3794c9cef/latex2mathml-3.78.0-py3-none-any.whl", hash = "sha256:1aeca3dc027b3006ad7b301b7f4a15ffbb4c1451e3dc8c3389e97b37b497e1d6", size = 73673, upload-time = "2025-05-03T16:51:51.991Z" },
+]
+
+[[package]]
 name = "lxml"
 version = "6.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -79,25 +88,26 @@ wheels = [
 name = "pulldown-cmark"
 version = "0.1.0"
 source = { editable = "." }
-dependencies = [
-    { name = "pygments" },
-]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 test = [
     { name = "beautifulsoup4" },
+    { name = "latex2mathml" },
     { name = "lxml" },
+    { name = "pygments" },
     { name = "pytest" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", marker = "extra == 'test'", specifier = ">=4.13.4" },
-    { name = "lxml", marker = "extra == 'test'", specifier = ">=6.0.0" },
+
+[package.metadata.requires-dev]
+test = [
+    { name = "beautifulsoup4", specifier = ">=4.13.4" },
+    { name = "latex2mathml", specifier = ">=3.78.0" },
+    { name = "lxml", specifier = ">=6.0.0" },
     { name = "pygments", specifier = ">=2.19.2" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.4.1" },
+    { name = "pytest", specifier = ">=8.4.1" },
 ]
-provides-extras = ["test"]
 
 [[package]]
 name = "pygments"

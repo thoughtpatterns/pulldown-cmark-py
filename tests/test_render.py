@@ -7,6 +7,10 @@ from typing import cast
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
+from latex2mathml.converter import convert as to_mathml
+from pygments import highlight  # pyright: ignore[reportUnknownVariableType]
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name, guess_lexer
 
 from pulldown_cmark import Options, render
 
@@ -43,6 +47,15 @@ class TestRender:
         markdown = normalize(markdown)
 
         assert html == markdown
+
+    @staticmethod
+    def math_callback(buffer: str, display: bool, /) -> str:  # noqa: FBT001
+        return to_mathml(buffer, "display" if display else "inline")
+
+    @staticmethod
+    def code_callback(buffer: str, language: str | None, /) -> str:
+        lexer = get_lexer_by_name(language) if language else guess_lexer(buffer)
+        return highlight(buffer, lexer, HtmlFormatter())
 
     def test_tables(self) -> None:
         html = """
@@ -211,162 +224,77 @@ class TestRender:
 
     def test_old_footnotes(self) -> None:
         html = """
-        <p>
-          foo
-          <sup class="footnote-reference">
-            <a href="#1">
-              1
-            </a>
-          </sup>
-          bar
-          <sup class="footnote-reference">
-            <a href="#2">
-              2
-            </a>
-          </sup>
-          qux
-          <sup class="footnote-reference">
-            <a href="#4">
-              3
-            </a>
-          </sup>
-        </p>
-        <p>
-          baz
-          <sup class="footnote-reference">
-            <a href="#3">
-              4
-            </a>
-          </sup>
-        </p>
-        <div class="footnote-definition" id="1">
-          <sup class="footnote-definition-label">
-            1
-          </sup>
-          <p>
-            foo
-          </p>
-        </div>
-        <div class="footnote-definition" id="2">
-          <sup class="footnote-definition-label">
-            2
-          </sup>
-          <p>
-            bar
-          </p>
-        </div>
-        <div class="footnote-definition" id="3">
-          <sup class="footnote-definition-label">
-            4
-          </sup>
-          <p>
-            baz
-          </p>
-        </div>
-        <p>
-          quux
-        </p>
-        """
+                <p>
+                  foo
+                  <sup class="footnote-reference">
+                    <a href="#1">
+                      1
+                    </a>
+                  </sup>
+                  bar
+                  <sup class="footnote-reference">
+                    <a href="#2">
+                      2
+                    </a>
+                  </sup>
+                  qux
+                  <sup class="footnote-reference">
+                    <a href="#4">
+                      3
+                    </a>
+                  </sup>
+                </p>
+                <p>
+                  baz
+                  <sup class="footnote-reference">
+                    <a href="#3">
+                      4
+                    </a>
+                  </sup>
+                </p>
+                <div class="footnote-definition" id="1">
+                  <sup class="footnote-definition-label">
+                    1
+                  </sup>
+                  <p>
+                    foo
+                  </p>
+                </div>
+                <div class="footnote-definition" id="2">
+                  <sup class="footnote-definition-label">
+                    2
+                  </sup>
+                  <p>
+                    bar
+                  </p>
+                </div>
+                <div class="footnote-definition" id="3">
+                  <sup class="footnote-definition-label">
+                    4
+                  </sup>
+                  <p>
+                    baz
+                  </p>
+                </div>
+                <p>
+                  quux
+                </p>
+                """
 
         markdown = """
-        foo[^1] bar[^2] qux[^4]
+                foo[^1] bar[^2] qux[^4]
 
-        baz[^3]
+                baz[^3]
 
-        [^1]: foo
-        [^2]: bar
+                [^1]: foo
+                [^2]: bar
 
-        [^3]: baz
+                [^3]: baz
 
-          quux
-        """
+                  quux
+                """
 
         TestRender.assert_render(html, markdown, Options(old_footnotes=True))
-
-    def test_math(self) -> None:
-        html = r"""
-        <p>
-          <span class="katex">
-            <math xmlns="http://www.w3.org/1998/Math/MathML">
-              <semantics>
-                <mrow>
-                  <msup>
-                    <mi>
-                      x
-                    </mi>
-                    <mn>
-                      2
-                    </mn>
-                  </msup>
-                  <mo>
-                    +
-                  </mo>
-                  <msup>
-                    <mi>
-                      y
-                    </mi>
-                    <mn>
-                      2
-                    </mn>
-                  </msup>
-                  <mo>
-                    =
-                  </mo>
-                  <mn>
-                    1
-                  </mn>
-                </mrow>
-                <annotation encoding="application/x-tex">
-                  x^2 + y^2 = 1
-                </annotation>
-              </semantics>
-            </math>
-          </span>
-          <span class="katex">
-            <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
-              <semantics>
-                <mrow>
-                  <msubsup>
-                    <mo>
-                      &int;
-                    </mo>
-                    <mn>
-                      0
-                    </mn>
-                    <mn>
-                      1
-                    </mn>
-                  </msubsup>
-                  <msup>
-                    <mi>
-                      x
-                    </mi>
-                    <mn>
-                      2
-                    </mn>
-                  </msup>
-                  <mi mathvariant="normal">
-                    d
-                  </mi>
-                  <mi>
-                    x
-                  </mi>
-                </mrow>
-                <annotation encoding="application/x-tex">
-                  \int_0^1 x^2 \mathrm{d}x
-                </annotation>
-              </semantics>
-            </math>
-          </span>
-        </p>
-        """
-
-        markdown = r"""
-        $x^2 + y^2 = 1$
-        $$\int_0^1 x^2 \mathrm{d}x$$
-        """
-
-        TestRender.assert_render(html, markdown, Options(math=True))
 
     def test_gfm(self) -> None:
         html = """
@@ -457,13 +385,91 @@ class TestRender:
 
         TestRender.assert_render(html, markdown, Options(wikilinks=True))
 
-    def test_highlight_none(self) -> None:
+    def test_math_inline(self) -> None:
+        html = r"""
+        <p>
+          <math display="inline" xmlns="inline">
+            <mrow>
+              <msubsup>
+                <mo>
+                  ∫
+                </mo>
+                <mn>
+                  0
+                </mn>
+                <mn>
+                  1
+                </mn>
+              </msubsup>
+              <mi>
+                x
+              </mi>
+              <mspace width="0.167em">
+              </mspace>
+              <mi>
+                d
+              </mi>
+              <mi>
+                x
+              </mi>
+            </mrow>
+          </math>
+        </p>
+        """
+
+        markdown = r"""
+        $\int_0^1 x \, dx$
+        """
+
+        TestRender.assert_render(html, markdown, Options(math=TestRender.math_callback))
+
+    def test_math_display(self) -> None:
+        html = r"""
+        <p>
+          <math display="inline" xmlns="display">
+            <mrow>
+              <msubsup>
+                <mo>
+                  ∫
+                </mo>
+                <mn>
+                  0
+                </mn>
+                <mn>
+                  1
+                </mn>
+              </msubsup>
+              <mi>
+                x
+              </mi>
+              <mspace width="0.167em">
+              </mspace>
+              <mi>
+                d
+              </mi>
+              <mi>
+                x
+              </mi>
+            </mrow>
+          </math>
+        </p>
+        """
+
+        markdown = r"""
+        $$\int_0^1 x \, dx$$
+        """
+
+        TestRender.assert_render(html, markdown, Options(math=TestRender.math_callback))
+
+    def test_highlight_anonymous(self) -> None:
         html = """
         <html>
           <body>
-            <pre><code>let x
+            <div class="highlight">
+              <pre><span></span>let x
             = 1;
-        </code></pre>
+        </pre>
+            </div>
           </body>
         </html>
         """
@@ -475,15 +481,17 @@ class TestRender:
         ```
         """
 
-        TestRender.assert_render(html, markdown, Options(highlight=True))
+        TestRender.assert_render(html, markdown, Options(code=TestRender.code_callback))
 
-    def test_highlight_rust(self) -> None:
+    def test_highlight_language(self) -> None:
         html = """
         <html>
           <body>
-            <pre><code class="language-rust"><span class="source rust"><span class="storage type rust">let</span> x
-            <span class="keyword operator rust">=</span> <span class="constant numeric integer decimal rust">1</span><span class="punctuation terminator rust">;</span>
-        </span></code></pre>
+            <div class="highlight">
+              <pre><span></span><span class="kd">let</span><span class="w"></span><span class="n">x</span>
+        <span class="w"></span><span class="o">=</span><span class="w"></span><span class="mi">1</span><span class="p">;</span>
+        </pre>
+            </div>
           </body>
         </html>
         """  # noqa: E501
@@ -495,4 +503,4 @@ class TestRender:
         ```
         """
 
-        TestRender.assert_render(html, markdown, Options(highlight=True))
+        TestRender.assert_render(html, markdown, Options(code=TestRender.code_callback))
