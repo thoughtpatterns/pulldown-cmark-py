@@ -1,8 +1,9 @@
 [project]
 name = "pulldown-cmark"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Python interface to pulldown-cmark."
 readme = "README.md"
+license = "0BSD"
 authors = [{ name = "Mohamad Makki", email = "moe.m.makki@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = []

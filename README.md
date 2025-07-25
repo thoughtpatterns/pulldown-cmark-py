@@ -6,7 +6,7 @@ An easy-to-use, configurable Python wrapper around
 ## Installation
 
 ```bash
-uv add "git+https://git.sr.ht/~orchid/pulldown-cmark-py"
+uv add pulldown-cmark
 ```
 
 ## Usage
