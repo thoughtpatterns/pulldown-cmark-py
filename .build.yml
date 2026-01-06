@@ -1,0 +1,12 @@
+image: alpine/edge
+secrets: [36d71ac4-5884-47dc-9c6d-a90ae9c11e26]
+sources: [git@git.sr.ht:~orchid/pulldown-cmark-py]
+environment:
+  GIT_SSH_COMMAND: ssh -o StrictHostKeyChecking=no
+tasks:
+  - setup: |
+      printf '%s\n' 'cd pulldown-cmark-py' >> ~/.buildenv
+  - check: |
+      [ "$(git rev-parse origin/main)" = "$(git rev-parse HEAD)" ] || complete-build
+  - mirror: |
+      git push --force --mirror git@github.com:thoughtpatterns/pulldown-cmark-py
